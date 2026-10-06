@@ -33,22 +33,20 @@ ROOT = Path(__file__).resolve().parent
 TOOLS_DIR = ROOT / "tools"
 sys.path.insert(0, str(TOOLS_DIR))
 
-from pe_resources import (  # noqa: E402
+from winres import (  # noqa: E402
     RT_DIALOG,
     RT_MENU,
     RT_STRING,
     build_string_block,
-    parse_string_block,
-    read_resources,
-    update_resources,
-)
-from resource_formats import (  # noqa: E402
     parse_dialog,
     parse_menu,
+    parse_string_block,
+    read_resources,
     serialize_dialog,
     serialize_menu,
+    update_resources,
 )
-from verify_pe_sections import sections as pe_sections  # noqa: E402
+from verify import compare_sections  # noqa: E402
 
 ENGLISH_US = 1033
 DEFAULT_CATALOG = ROOT / "translations" / "zh_CN.json"
@@ -419,22 +417,28 @@ def plan_updates(
     return updates, report
 
 
-def compare_sections(before_path: Path, after_path: Path) -> dict[str, object]:
-    """比较两个 PE 文件：只允许资源段变化，代码/数据段必须逐字节一致。"""
-    before = pe_sections(before_path)
-    after = pe_sections(after_path)
-    names = sorted(before.keys() | after.keys())
-    identical = {name: before.get(name) == after.get(name) for name in names}
-    code_ok = all(
-        identical.get(name, False)
-        for name in (".text", ".rdata", ".data")
-        if name in identical
-    )
-    return {
-        "code_sections_identical": code_ok,
-        "resource_section_changed": not identical.get(".rsrc", True),
-        "changed_sections": [name for name in names if not identical[name]],
-    }
+def restore(target: Path) -> int:
+    """从 UV4.exe.bak 还原原版，并清理旧式中文副本。"""
+    backup = target.with_name(target.name + ".bak")
+    restored = False
+    if backup.is_file():
+        shutil.copy2(backup, target)
+        backup.unlink()
+        restored = True
+        print(f"已从 {backup.name} 还原原版 {target.name}（并删除备份）。")
+    removed = False
+    for name in ("UV4_zh-CN.exe", "UV4_CN.exe"):
+        copy = target.with_name(name)
+        if copy.is_file():
+            try:
+                copy.unlink()
+                removed = True
+                print(f"已删除中文副本 {name}。")
+            except OSError as error:
+                print(f"警告：无法删除 {copy}（可能仍在运行）：{error}")
+    if not restored and not removed:
+        print("没有发现汉化痕迹（UV4.exe.bak 不存在，也没有中文副本）。")
+    return 0
 
 
 def main() -> int:
@@ -484,6 +488,11 @@ def main() -> int:
         action="store_true",
         help="accept only the fully tested executable hash",
     )
+    parser.add_argument(
+        "--restore",
+        action="store_true",
+        help="restore the original English UV4.exe from UV4.exe.bak and exit",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -492,6 +501,9 @@ def main() -> int:
         raise SystemExit(
             "Could not locate UV4.exe automatically; pass --target \"<...>\\UV4\\UV4.exe\"."
         )
+    if args.restore:
+        print(f"Keil 安装目录：{target.parent}")
+        return restore(target)
     if not target.is_file():
         raise SystemExit(f"Target file does not exist: {target}")
 

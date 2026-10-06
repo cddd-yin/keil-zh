@@ -5,7 +5,7 @@
   "product": "Arm Keil µVision",
   "version": "5.40.0.0",
   "sha256": "706339F56FA096AB8F2635E46928A9090239DB028A745B124946E1E73A9B6184",
-  "note": "资源身份 + 英文原文 SHA-256 双重匹配；未命中项保持英文。在其它 µVision 5.x 上走兼容模式（默认需 ≥70% 命中）。"
+  "note": "资源身份 + 英文原文 SHA-256 双重匹配；未命中项保持英文。"
  },
  "translations": {
   "string_table": {
@@ -13044,6 +13044,5 @@
   "dialog_texts": 2043,
   "total_entries": 3136,
   "source_texts": 2118
- },
- "problems": []
+ }
 }

@@ -75,12 +75,12 @@
 ```powershell
 python build_patch.py                       # 原地汉化（默认；自动备份 UV4.exe.bak）
 python build_patch.py --dry-run             # 只统计，不写文件
-python build_patch.py --target "<...>\UV4.exe"
+python build_patch.py --restore             # 还原英文（等价于 工具\还原英文.cmd）
 python build_patch.py --copy                # 非破坏式：只生成旁边的 UV4_zh-CN.exe
+python build_patch.py --target "<...>\UV4.exe"
 python build_patch.py --min-coverage 0.85   # 其它版本提高兼容模式阈值
 python build_patch.py --exact-only          # 只接受完整验证过的版本哈希
-python tools\verify_pe_sections.py "<原版备份>" "<UV4.exe>"   # 校验仅资源段被改动
-python tools\validate_formats.py "<UV4.exe>"                 # 校验菜单/对话框可无损解析
+python tools\verify.py "<原版备份>" "<UV4.exe>"   # 校验仅资源段被改动 + 资源可无损解析
 ```
 
 ## 覆盖情况
@@ -123,30 +123,24 @@ python tools\validate_formats.py "<UV4.exe>"                 # 校验菜单/对�
 ## 目录结构
 
 ```
-build_patch.py            补丁生成器入口（默认原地汉化 + 自动备份 + 写入前校验）
+build_patch.py            入口：原地汉化（默认）/ --copy / --restore / --dry-run
 tools/
-  pe_resources.py         PE 资源读写（Windows 资源 API）+ 字符串表编解码
-  resource_formats.py     菜单 / 对话框资源格式解析与序列化
-  make_catalog.py         由 translations/src/*.json + 官方 UV4.exe 生成指纹词典
-  extract.py              导出界面资源（供维护词典）
-  validate_formats.py     校验菜单/对话框可无损往返解析
-  verify_pe_sections.py   校验仅资源段被改动（代码段逐字节一致）
-  export_translation_catalog.py  由“原版/汉化版”对照导出指纹词典
-  restore.py              还原英文（从 UV4.exe.bak）
+  winres.py               PE 资源读写 + 字符串表 / 菜单 / 对话框格式解析
+  catalog.py              由 translations/src.json + 官方 UV4.exe 生成指纹词典
+  verify.py               PE 段对比 + 菜单/对话框往返解析校验
 translations/
   zh_CN.json              编译好的指纹词典（补丁实际使用）
-  src/*.json              词典源文件（便于审校与维护）
+  src.json                词典源文件（英文原文 → 简体中文）
 工具/                     一键脚本（生成中文版 / 预览匹配 / 还原英文）
 截图/                     效果截图
-docs/                     原理、兼容性与开发验证记录
 ```
 
 ## 维护与二次开发
 
-- 修正某个词条：编辑 `translations/src/*.json` 中对应的“英文原文 → 中文”，
-  运行 `python tools\make_catalog.py`（会自动定位官方 `UV4.exe`）重新生成词典；
-- 补翻新版本新增文案：`python tools\extract.py "<...>\UV4.exe"` 导出资源，
-  在 `translations/src/*.json` 补全后重新运行 `make_catalog.py`；
+- 修正某个词条：编辑 `translations/src.json` 中对应的“英文原文 → 中文”，
+  运行 `python tools\catalog.py`（会自动定位官方 `UV4.exe`）重新生成词典；
+- 补翻新版本新增文案：先跑一次 `tools\catalog.py`，未翻译的界面文本会列到
+  `build\missing.txt`，补进 `src.json` 后重新生成即可；
 - 词典按“**资源身份 + 原文指纹**”生成，因此同一原文在不同位置的上下文差异可被区分。
 
 ## 常见问题

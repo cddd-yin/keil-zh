@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""从翻译源文件与官方 UV4.exe 生成带原文指纹的词典 translations/zh_CN.json。
+"""生成带“原文指纹”的词典 translations/zh_CN.json。
 
-工作方式（与参考项目 player4086/keil-uv5-zh-cn-patch 一致）：
-
-1. 合并 translations/src/*.json（平铺的 {英文原文: 简体中文}）为一张全局表；
-2. 扫描官方 UV4.exe 中语言 1033 的字符串表 / 菜单 / 对话框，
-   把每一条可翻译文本与全局表对照；
-3. 对命中且通过安全校验（格式符 / 快捷键 / 助记符 / 换行）的条目，
-   记录 **资源身份 + 英文原文 SHA-256 + 译文**；未命中或校验不通过的保持英文；
-4. 输出 format_version=2 的词典，供 build_patch.py 使用。
+流程：
+  1. 读取 translations/src.json（平铺的 {英文原文: 简体中文}）；
+  2. 扫描官方 UV4.exe 中语言 1033 的字符串表 / 菜单 / 对话框；
+  3. 对命中且通过安全校验（格式符 / 快捷键 / 助记符 / 换行）的条目，
+     记录 **资源身份 + 英文原文 SHA-256 + 译文**；
+  4. 写出 translations/zh_CN.json，并把未翻译的界面文本写到 build/missing.txt。
 
 用法：
-  python tools\\make_catalog.py                       # 自动定位 UV4.exe
-  python tools\\make_catalog.py --target "<...>\\UV4.exe"
+  python tools\\catalog.py                 # 自动定位 UV4.exe
+  python tools\\catalog.py --target "<...>\\UV4.exe"
 """
 
 from __future__ import annotations
@@ -29,17 +27,18 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "tools"))
 
 from build_patch import file_version, find_target, sha256, text_sha256  # noqa: E402
-from pe_resources import (  # noqa: E402
+from winres import (  # noqa: E402
     RT_DIALOG,
     RT_MENU,
     RT_STRING,
+    iter_menu_items,
+    parse_dialog,
+    parse_menu,
     parse_string_block,
     read_resources,
 )
-from resource_formats import iter_menu_items, parse_dialog, parse_menu  # noqa: E402
 
-
-SRC = ROOT / "translations" / "src"
+SRC = ROOT / "translations" / "src.json"
 OUT = ROOT / "translations" / "zh_CN.json"
 BUILD = ROOT / "build"
 ENGLISH_US = 1033
@@ -67,43 +66,21 @@ def validate(source: str, translation: str, kind: str) -> str | None:
     return None
 
 
-def load_parts() -> tuple[dict[str, str], list[str]]:
-    texts: dict[str, str] = {}
-    problems: list[str] = []
-    origin: dict[str, str] = {}
-    for path in sorted(SRC.glob("*.json")):
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            problems.append(f"{path.name}: 顶层必须是对象")
-            continue
-        for key, value in data.items():
-            if not isinstance(value, str) or not value:
-                problems.append(f"{path.name}: 译文为空 -> {key!r}")
-                continue
-            if key in texts and texts[key] != value:
-                problems.append(
-                    f"冲突：{key!r}\n    {origin[key]} => {texts[key]!r}\n"
-                    f"    {path.name} => {value!r}"
-                )
-                continue
-            texts[key] = value
-            origin[key] = path.name
-    return texts, problems
-
-
 def entry(source: str, translation: str) -> dict[str, str]:
     return {"source_sha256": text_sha256(source), "translation": translation}
 
 
 def build_catalog(target: Path) -> tuple[dict, list[str]]:
-    texts, problems = load_parts()
+    texts: dict[str, str] = json.loads(SRC.read_text(encoding="utf-8"))
     ignored: list[str] = []
+    missing: set[str] = set()
 
     def translate(source: str, kind: str, label: str) -> str | None:
         if not source:
             return None
         translation = texts.get(source)
         if translation is None or translation == source:
+            missing.add(source)
             return None
         problem = validate(source, translation, kind)
         if problem:
@@ -125,8 +102,7 @@ def build_catalog(target: Path) -> tuple[dict, list[str]]:
             continue
 
         if rtype == RT_STRING:
-            values = parse_string_block(name, data)
-            for sid, source in sorted(values.items()):
+            for sid, source in sorted(parse_string_block(name, data).items()):
                 translation = translate(source, "string_table", f"string {sid}")
                 if translation is not None:
                     string_table[str(sid)] = entry(source, translation)
@@ -134,9 +110,8 @@ def build_catalog(target: Path) -> tuple[dict, list[str]]:
                     stats["strings"] += 1
 
         elif rtype == RT_MENU:
-            menu = parse_menu(data)
             entries: dict[str, dict[str, str]] = {}
-            for path, node in iter_menu_items(menu["items"]):
+            for path, node in iter_menu_items(parse_menu(data)["items"]):
                 source = str(node.get("text") or "")
                 translation = translate(source, "menus", f"menu {name}:{path}")
                 if translation is not None:
@@ -174,10 +149,7 @@ def build_catalog(target: Path) -> tuple[dict, list[str]]:
             "product": "Arm Keil µVision",
             "version": version,
             "sha256": sha256(target),
-            "note": (
-                "资源身份 + 英文原文 SHA-256 双重匹配；未命中项保持英文。"
-                "在其它 µVision 5.x 上走兼容模式（默认需 ≥70% 命中）。"
-            ),
+            "note": "资源身份 + 英文原文 SHA-256 双重匹配；未命中项保持英文。",
         },
         "translations": {
             "string_table": dict(sorted(string_table.items(), key=lambda kv: int(kv[0]))),
@@ -191,34 +163,11 @@ def build_catalog(target: Path) -> tuple[dict, list[str]]:
             "menu_items": stats["menu_items"],
             "dialog_resources": stats["dialog_resources"],
             "dialog_texts": stats["dialog_texts"],
-            "total_entries": (
-                stats["strings"] + stats["menu_items"] + stats["dialog_texts"]
-            ),
+            "total_entries": stats["strings"] + stats["menu_items"] + stats["dialog_texts"],
             "source_texts": len(texts),
         },
-        "problems": ignored,
     }
-    return catalog, problems
-
-
-def write_coverage(catalog: dict) -> None:
-    stats = catalog["stats"]
-    BUILD.mkdir(exist_ok=True)
-    (BUILD / "coverage.txt").write_text(
-        "\n".join(
-            (
-                f"词典条目：{stats['total_entries']}",
-                f"字符串表：{stats['strings']} 条 / {stats['string_resources']} 组",
-                f"菜单：{stats['menu_items']} 项 / {stats['menu_resources']} 组",
-                f"对话框：{stats['dialog_texts']} 处 / {stats['dialog_resources']} 个",
-                f"源词典条目：{stats['source_texts']}",
-                f"目标版本：{catalog['target']['version']}",
-                f"目标 SHA-256：{catalog['target']['sha256']}",
-            )
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    return catalog, ignored, missing
 
 
 def main() -> int:
@@ -232,31 +181,33 @@ def main() -> int:
     target = args.target.resolve() if args.target is not None else find_target()
     if target is None or not target.is_file():
         raise SystemExit("找不到官方 UV4.exe；请用 --target 手动指定。")
+    # 原地汉化后 UV4.exe 已是中文，指纹词典必须从英文备份生成。
+    backup = target.with_name(target.name + ".bak")
+    if backup.is_file():
+        target = backup
 
-    catalog, problems = build_catalog(target)
+    catalog, ignored, missing = build_catalog(target)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(
         json.dumps(catalog, ensure_ascii=False, indent=1) + "\n", encoding="utf-8"
     )
     BUILD.mkdir(exist_ok=True)
-    write_coverage(catalog)
+    (BUILD / "missing.txt").write_text(
+        "\n".join(sorted(missing)) + "\n", encoding="utf-8"
+    )
 
     stats = catalog["stats"]
-    print(f"目标：{target}")
-    print(f"版本：{catalog['target']['version']}")
-    print(f"SHA-256：{catalog['target']['sha256']}")
+    print(f"目标：{target}（版本 {catalog['target']['version']}）")
     print(f"字符串表：{stats['strings']} 条")
     print(f"菜单：{stats['menu_items']} 项 / {stats['menu_resources']} 组")
     print(f"对话框：{stats['dialog_texts']} 处 / {stats['dialog_resources']} 个")
-    print(f"合计：{stats['total_entries']} 条（源文件共 {stats['source_texts']} 条）")
+    print(f"合计：{stats['total_entries']} 条（源词典 {stats['source_texts']} 条）")
     print(f"已写出：{args.output}")
-    if problems:
-        print(f"\n!!! 发现 {len(problems)} 个源词典问题：")
-        for item in problems[:40]:
+    print(f"未翻译界面文本：{len(missing)} 条 -> build\\missing.txt")
+    if ignored:
+        print(f"\n注意：{len(ignored)} 条译文未通过安全校验（已跳过，保持英文）：")
+        for item in ignored[:20]:
             print("  -", item)
-        return 1
-    if catalog["problems"]:
-        print(f"\n注意：{len(catalog['problems'])} 条译文未通过校验（已跳过，保持英文）。")
     return 0
 
 

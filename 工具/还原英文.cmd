@@ -23,7 +23,7 @@ if not defined PYCMD (
 echo Using Python: %PYCMD%
 echo Restoring the official English Keil uVision ...
 echo.
-%PYCMD% "tools\restore.py"
+%PYCMD% "build_patch.py" --restore
 echo.
 pause
 exit /b 0
