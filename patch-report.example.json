@@ -1,0 +1,57 @@
+{
+  "target": "C:\\Keil_v5\\UV4\\UV4.exe",
+  "language": 1033,
+  "string_table": {
+    "resources": 142,
+    "texts": 828
+  },
+  "menus": {
+    "resources": 33,
+    "texts": 265
+  },
+  "dialogs": {
+    "resources": 205,
+    "texts": 2043
+  },
+  "resource_updates": 380,
+  "coverage": {
+    "matched": 3136,
+    "total": 3136,
+    "ratio": 1.0,
+    "matched_strings": 828,
+    "total_strings": 828,
+    "unmatched_string_ids": [],
+    "matched_menu_items": 265,
+    "total_menu_items": 265,
+    "unmatched_menu_items": [],
+    "matched_dialog_texts": 2043,
+    "total_dialog_texts": 2043,
+    "unmatched_dialog_texts": []
+  },
+  "target_version": "5.40.0.0",
+  "target_sha256": "706339F56FA096AB8F2635E46928A9090239DB028A745B124946E1E73A9B6184",
+  "source": "C:\\Keil_v5\\UV4\\UV4.exe",
+  "source_sha256": "706339F56FA096AB8F2635E46928A9090239DB028A745B124946E1E73A9B6184",
+  "mode": "in-place",
+  "backup": "C:\\Keil_v5\\UV4\\UV4.exe.bak",
+  "catalog": "translations\\zh_CN.json",
+  "catalog_sha256": "5C8543FE0A334AB775600521FC7678D49B4FF9E98C64FA88224F0120F88C218D",
+  "compatibility": {
+    "mode": "exact-tested",
+    "fully_tested": true,
+    "minimum_coverage": 0.7,
+    "exact_only": false,
+    "accepted": true
+  },
+  "output": "C:\\Keil_v5\\UV4\\UV4.exe",
+  "dry_run": false,
+  "backup_created": true,
+  "verification": {
+    "code_sections_identical": true,
+    "resource_section_changed": true,
+    "changed_sections": [
+      ".rsrc"
+    ]
+  },
+  "output_sha256": "00ABEF546D3A75DEE5B0AF9B36DA5B4B7E68F11FAEC5C1DE7F2DC1CE7772978A"
+}

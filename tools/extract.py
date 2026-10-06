@@ -2,9 +2,9 @@
 """导出 UV4.exe 中的界面资源，生成可供翻译/比对的结构化 JSON。
 
 用法：
-  python tools/extract.py <UV4.exe> [输出目录]
+  python tools\\extract.py <UV4.exe> [输出目录]
 
-输出（默认写入 tools\../build/）：
+输出（默认写入 build/）：
   resources.json  —— 全部语言下的字符串表 / 菜单 / 对话框文本
   summary.txt     —— 各语言、各类型的资源统计
 """
@@ -16,12 +16,17 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-from winres import (  # noqa: E402
-    LANG_EN_GB, LANG_EN_US, LANG_JA_JP, LANG_ZH_CN,
-    RT_DIALOG, RT_MENU, RT_STRING,
-    parse_dialog, parse_menu, parse_string_block, read_resources,
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "tools"))
+
+from pe_resources import (  # noqa: E402
+    RT_DIALOG,
+    RT_MENU,
+    RT_STRING,
+    parse_string_block,
+    read_resources,
 )
+from resource_formats import parse_dialog, parse_menu  # noqa: E402
 
 LANG_NAME = {1033: "en-US", 2057: "en-GB", 1041: "ja-JP", 2052: "zh-CN"}
 
@@ -31,9 +36,9 @@ _DROP_KEYS = {"prefix", "tail", "extra_payload"}
 def _clean(obj):
     """去掉二进制字段，得到可直接序列化为 JSON 的纯文本结构。"""
     if isinstance(obj, dict):
-        return {k: _clean(v) for k, v in obj.items() if k not in _DROP_KEYS}
+        return {key: _clean(value) for key, value in obj.items() if key not in _DROP_KEYS}
     if isinstance(obj, (list, tuple)):
-        return [_clean(v) for v in obj]
+        return [_clean(value) for value in obj]
     if isinstance(obj, bytes):
         return f"<{len(obj)} bytes>"
     return obj
@@ -46,26 +51,28 @@ def main() -> int:
         print(__doc__)
         return 1
     target = Path(sys.argv[1]).resolve()
-    out_dir = Path(sys.argv[2]).resolve() if len(sys.argv) > 2 else Path(__file__).resolve().parent.parent / "build"
+    out_dir = (
+        Path(sys.argv[2]).resolve()
+        if len(sys.argv) > 2
+        else Path(__file__).resolve().parent.parent / "build"
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    resources = read_resources(str(target))
+    resources = read_resources(target)
     payload: dict = {"target": str(target), "languages": {}}
     counts: Counter = Counter()
     lang_counts: Counter = Counter()
 
     for item in resources:
         counts[str(item["type"])] += 1
-        lang = int(item["lang"])
-        lang_counts[lang] += 1
+        lang_counts[int(item["lang"])] += 1
 
     for item in resources:
         lang = int(item["lang"])
-        lang_key = str(lang)
-        bucket = payload["languages"].setdefault(lang_key, {
-            "name": LANG_NAME.get(lang, f"lang-{lang}"),
-            "string_table": {}, "menus": {}, "dialogs": {},
-        })
+        bucket = payload["languages"].setdefault(
+            str(lang),
+            {"name": LANG_NAME.get(lang, f"lang-{lang}"), "string_table": {}, "menus": {}, "dialogs": {}},
+        )
         rtype, rname = item["type"], item["name"]
         if rtype == RT_STRING and isinstance(rname, int):
             for sid, text in parse_string_block(rname, item["data"]).items():
@@ -83,10 +90,13 @@ def main() -> int:
                 bucket["dialogs"][str(rname)] = {"error": str(exc)}
 
     (out_dir / "resources.json").write_text(
-        json.dumps(_clean(payload), ensure_ascii=False, indent=1), encoding="utf-8")
+        json.dumps(_clean(payload), ensure_ascii=False, indent=1), encoding="utf-8"
+    )
 
     lines = [f"目标：{target}", f"资源总数：{len(resources)}", "", "按类型："]
-    for key, value in sorted(counts.items(), key=lambda kv: int(kv[0]) if kv[0].isdigit() else 9999):
+    for key, value in sorted(
+        counts.items(), key=lambda kv: int(kv[0]) if kv[0].isdigit() else 9999
+    ):
         lines.append(f"  type {key}: {value}")
     lines.append("")
     lines.append("按语言：")
@@ -96,7 +106,8 @@ def main() -> int:
     for lang_key, bucket in sorted(payload["languages"].items(), key=lambda kv: int(kv[0])):
         lines.append(
             f"{lang_key} {bucket['name']}: 字符串 {len(bucket['string_table'])} / "
-            f"菜单 {len(bucket['menus'])} / 对话框 {len(bucket['dialogs'])}")
+            f"菜单 {len(bucket['menus'])} / 对话框 {len(bucket['dialogs'])}"
+        )
     text = "\n".join(lines) + "\n"
     (out_dir / "summary.txt").write_text(text, encoding="utf-8")
     print(text)
