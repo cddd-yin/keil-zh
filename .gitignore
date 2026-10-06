@@ -1,0 +1,9 @@
+# 构建产物与缓存（不入库）
+build/
+__pycache__/
+*.pyc
+
+# 本地生成的中文副本 / 备份（不应入库）
+UV4_zh-CN.exe
+UV4.exe.bak
+patch-report.json
