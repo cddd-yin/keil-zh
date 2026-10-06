@@ -1,20 +1,32 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0.."
-set "PY="
-where python >nul 2>nul && set "PY=python"
-if not defined PY ( where py >nul 2>nul && set "PY=py -3" )
-if not defined PY (
+
+set "PYCMD="
+if exist "python-path.txt" for /f "usebackq delims=" %%i in ("python-path.txt") do if not defined PYCMD set "PYCMD=%%i"
+if not defined PYCMD if defined PYTHON set "PYCMD=%PYTHON%"
+if not defined PYCMD if exist "tools\python\python.exe" set "PYCMD=tools\python\python.exe"
+if not defined PYCMD (
+  python --version >nul 2>nul
+  if not errorlevel 1 set "PYCMD=python"
+)
+if not defined PYCMD (
+  py -3 --version >nul 2>nul
+  if not errorlevel 1 set "PYCMD=py -3"
+)
+
+if not defined PYCMD (
   echo.
-  echo [ERROR] Python 3 not found. Please install Python 3.8+ from
-  echo         https://www.python.org/downloads/windows/
+  echo [ERROR] No working Python 3 found. See README for setup.
   echo.
   pause
   exit /b 1
 )
+
+echo Using Python: %PYCMD%
 echo Preview: matching the dictionary against the installed UV4.exe ...
 echo (no file will be written)
 echo.
-%PY% "tools\build_patch.py" --dry-run %*
+%PYCMD% "tools\build_patch.py" --dry-run %*
 echo.
 pause

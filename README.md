@@ -35,6 +35,10 @@
 - 已合法安装 Keil µVision 5.x（自带 `UV4\UV4.exe`）；
 - **Python 3.8+**（仅标准库，无需 pip 安装任何包）。
 
+> ⚠️ 注意：Windows 自带/商店里的 `python.exe` 往往是**占位程序**（运行后没有任何输出）。
+> 请安装真正的 Python（下面「常见问题」有说明），或使用便携版并在仓库根目录创建
+> `python-path.txt` 填入 `python.exe` 的完整路径（脚本会优先使用它）。
+
 ## 使用流程
 
 ### 1. 生成中文版
@@ -136,6 +140,16 @@ docs/                     原理、兼容性与开发验证记录
   `python tools\make_worklists.py` → 参考 `build/coverage.txt` 补全；
 - 词典支持**按上下文覆盖**：`translations/src/_overrides.json` 可对
   特定对话框控件 / 菜单项做定向翻译（键为 `dialog:资源号:item:控件号` 等）。
+
+## 常见问题
+
+| 现象 | 原因 | 解决 |
+| --- | --- | --- |
+| 双击「生成中文版.cmd」只闪过一行、没有生成 `UV4_zh-CN.exe` | 系统里的 `python` 是微软商店的**占位程序**（不执行 Python） | 安装真正的 Python 3.8+；或在仓库根目录新建 `python-path.txt`，写入某个 `python.exe` 的完整路径（脚本优先使用它） |
+| 提示 `No working Python 3 found` | 同上，或 Python 未加入 PATH | 同上 |
+| 提示找不到 `UV4.exe` | 安装位置特殊或注册表无记录 | 用 `工具\生成中文版.cmd --target "D:\Keil_v5\UV4\UV4.exe"` 手动指定 |
+| 提示 `Device Database`/属性表底部按钮仍是英文 | 这些文本硬编码在程序里，不在资源中 | 已知限制，见上文 |
+| 想彻底还原 | — | 双击 `工具\还原英文.cmd`；原版 `UV4.exe` 从未被修改 |
 
 ## 版权与免责声明
 
