@@ -1,10 +1,17 @@
 @echo off
-chcp 65001 >nul
+chcp 936 >nul
 cd /d "%~dp0.."
 
-rem ---- locate a working Python 3 interpreter ----
-rem The Microsoft Store "python.exe" alias does nothing, so every candidate
-rem must actually execute a tiny script before it is accepted.
+rem ---- 自动请求管理员权限（写入 Keil 安装目录可能需要） ----
+fltmc >nul 2>&1
+if errorlevel 1 (
+  echo [i] 正在请求管理员权限，请在弹窗中点「是」……
+  powershell -NoProfile -Command "try { Start-Process -FilePath '%~f0' -Verb RunAs } catch { Write-Host '[×] 未获得管理员权限（已取消）。可右键本 bat 选「以管理员身份运行」重试。' ; exit 1 }"
+  if errorlevel 1 pause
+  exit /b
+)
+
+rem ---- 探测可用的 Python 3（商店占位程序会被真实执行测试排除） ----
 set "PYCMD="
 if exist "python-path.txt" for /f "usebackq delims=" %%i in ("python-path.txt") do if not defined PYCMD set "PYCMD=%%i"
 if not defined PYCMD if defined PYTHON set "PYCMD=%PYTHON%"
@@ -17,24 +24,17 @@ if not defined PYCMD call :probe "py -3"
 
 if not defined PYCMD (
   echo.
-  echo [ERROR] No working Python 3 found.
-  echo         The "python" in this system may be the Microsoft Store
-  echo         placeholder, which does nothing.
-  echo.
-  echo         Fix: install Python 3.8+ from
-  echo             https://www.python.org/downloads/windows/
-  echo         and tick "Add python.exe to PATH".
-  echo         Or create python-path.txt in the repository root containing
-  echo         the full path of a python.exe on one line.
+  echo [错误] 没有找到可用的 Python 3。
+  echo        正常情况下仓库 tools\python\ 已内置便携版 Python，无需安装；
+  echo        走到这里说明仓库解压不完整，请重新下载解压整个仓库再试。
   echo.
   pause
   exit /b 1
 )
 
-echo Using Python: %PYCMD%
-echo Patching your installed Keil uVision 5.x to Simplified Chinese ...
-echo (the original UV4.exe is backed up as UV4.exe.bak first)
-echo (please CLOSE any running Keil / uVision first)
+echo 使用 Python: %PYCMD%
+echo 即将把已安装的 Keil uVision 5.x 原地汉化为简体中文 ……
+echo （原版 UV4.exe 会先备份为 UV4.exe.bak；请先关闭正在运行的 Keil）
 echo.
 if not exist build mkdir build
 %PYCMD% "build_patch.py" %* > "build\build.log" 2>&1
@@ -42,11 +42,12 @@ set "RC=%ERRORLEVEL%"
 type "build\build.log"
 echo.
 if "%RC%"=="0" (
-  echo [OK] Done. Your normal Keil shortcut now starts the Chinese UI.
-  echo      The English original is kept as UV4.exe.bak next to UV4.exe.
-  echo      To switch back to English, run the restore script.
+  echo [成功] 汉化完成。照常双击桌面/开始菜单的 Keil 图标即为中文界面。
+  echo        英文原版保留在 UV4.exe 旁的 UV4.exe.bak，随时可还原英文。
+  echo        想还原英文：双击根目录「一键还原英文.bat」。
 ) else (
-  echo [FAILED] exit code %RC%.  Full log saved to: build\build.log
+  echo [失败] 退出码 %RC%。完整日志见 build\build.log
+  echo        常见原因：Keil 正在运行（请关闭后重试）、权限不足（右键「以管理员身份运行」）。
 )
 echo.
 pause

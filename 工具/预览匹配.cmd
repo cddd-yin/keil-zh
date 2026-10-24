@@ -1,7 +1,8 @@
 @echo off
-chcp 65001 >nul
+chcp 936 >nul
 cd /d "%~dp0.."
 
+rem ---- 探测可用的 Python 3（预览不写文件，一般无需管理员） ----
 set "PYCMD="
 if exist "python-path.txt" for /f "usebackq delims=" %%i in ("python-path.txt") do if not defined PYCMD set "PYCMD=%%i"
 if not defined PYCMD if defined PYTHON set "PYCMD=%PYTHON%"
@@ -14,22 +15,21 @@ if not defined PYCMD call :probe "py -3"
 
 if not defined PYCMD (
   echo.
-  echo [ERROR] No working Python 3 found. See README for setup.
+  echo [错误] 没有找到可用的 Python 3。请确认仓库已完整解压（tools\python\ 内置便携版）。
   echo.
   pause
   exit /b 1
 )
 
-echo Using Python: %PYCMD%
-echo Preview: matching the dictionary against the installed UV4.exe ...
-echo (no file will be written)
+echo 使用 Python: %PYCMD%
+echo 预览模式：把词库与已安装的 UV4.exe 做匹配检查（不写任何文件）……
 echo.
 if not exist build mkdir build
 %PYCMD% "build_patch.py" --dry-run %* > "build\preview.log" 2>&1
 set "RC=%ERRORLEVEL%"
 type "build\preview.log"
 echo.
-echo Full log saved to: build\preview.log
+echo 完整日志见 build\preview.log
 echo.
 pause
 exit /b %RC%

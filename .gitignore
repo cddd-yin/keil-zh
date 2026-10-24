@@ -12,4 +12,4 @@ patch-report.json
 
 # 本机 Python 路径配置（各人机器不同，不入库）
 python-path.txt
-tools/python/
+
