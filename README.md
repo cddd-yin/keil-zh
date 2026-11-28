@@ -84,7 +84,7 @@ python tools\verify.py "<原版备份>" "<UV4.exe>"   # 校验仅资源段被改
 
 ## 覆盖情况
 
-以 µVision **5.40.0.0** 为例（见 `build/patch-report.json`）：
+以 µVision **5.40.0.0** 为例（见 `patch-report.json`）：
 
 | 资源 | 命中 / 总数 |
 | --- | --- |
@@ -94,6 +94,8 @@ python tools\verify.py "<原版备份>" "<UV4.exe>"   # 校验仅资源段被改
 | **合计（按出现次数）** | **3136 条** |
 
 词典在这些条目上的匹配率为 **100%**（`coverage.ratio = 1.0`）。
+
+> 口径说明：表格「命中 / 总数」中分子为 `patch-report.json` 的 `texts`/`matched` 字段（828/265/2043），分母 955/318/2294 为对应资源表全量条数；报告内 `coverage` 按词典匹配口径计（matched==total==3136、ratio 1.0），两者维度不同，均以各自口径成立。
 未命中的多为数字、寄存器名、器件型号、URL、脚本关键字等**本就不该翻译**的内容。
 
 ## 兼容性
